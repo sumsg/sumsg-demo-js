@@ -1,5 +1,7 @@
 # websocket demo
 
+![](images/thumb.png)
+
 ### 提示
 
 * 请勿泄露设备token
