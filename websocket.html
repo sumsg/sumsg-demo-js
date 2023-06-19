@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <title>开机卡websocket 接口 demo - sumsg.com</title>
+  <meta charset="utf-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+  <meta httpequiv="X-UA-Compatible" content="IE=edge, chrome=1">
+  <script src="./mqtt.min.js"></script>
+  <script src="./md5.min.js"></script>
+</head>
+
+<body>
+  <p style="font-size: 12px;">
+    提示：<br />
+    * 请勿泄露设备token<br />
+    * key和secret是您账号下所有设备的通行证，如泄露请联系官方重置<br />
+    * 强烈建议通过nodeJS，Java，PHP等服务器端部署token,key,secret等信息<br />
+  </p>
+  <br />
+  电源状态：<span id="powerState" style="color: chocolate;">_</span><br />
+  机箱温度：<span id="boxTemp" style="color: chocolate;">_</span><br />
+  来电自启：<span id="autoState" style="color: chocolate;">_</span>
+  <br /> <br />
+  <button id="powerOn">开机</button>
+  <button id="powerOff">关机</button>
+  <button id="restart">重启</button>
+  <button id="forceOff">强制关机</button>
+  <button id="auto">来电自启</button>
+  <script>
+    //以下信息需要通过客户端获取
+
+    const token = '';//您要控制的设备->右上角齿轮->网络信息->TOKEN 复制
+    const key = '';//我的->关于->开发->Key 复制
+    const secret = '';//我的->关于->开发->Secret 复制
+    const product = 'pcSw3'//开机卡型号，一代pcSw1，二代pcSw3
+
+    const clientId = 'Web_' + key.substr(0, 19)
+    const host = 'ws://broker.iot.sumsg.com:1324/mqtt'
+    const options = {
+      keepalive: 60,
+      clientId: clientId,
+      protocolId: 'MQTT',
+      protocolVersion: 4,
+      clean: true,
+      reconnectPeriod: 1000,
+      connectTimeout: 30 * 1000,
+      username: key,
+      password: secret,
+      will: {
+        topic: 'WillMsg',
+        payload: '{"t":"APPOFF"}',
+        qos: 0,
+        retain: false
+      },
+    }
+    const client = mqtt.connect(host, options)
+    client.on('connect', () => {
+      client.subscribe('su/' + product + '/' + token + '/server', { qos: 0 })
+    })
+    // Received
+    client.on('message', (topic, message, packet) => {
+      var res = JSON.parse(message);
+      console.log(res);
+      if (res.t == 'M') {
+        document.getElementById('powerState').innerText = (res.ps == 0 ? '已关机' : '已开机')
+        document.getElementById('boxTemp').innerText = res.tp + '℃'
+        document.getElementById('autoState').innerText = (res.au == 0 ? '否' : '是')
+        //设备在线时间S： res.ut 
+        //开机时间S：res.put
+        //正在关机：res.cl
+      }
+    })
+    client.on('error', (err) => {
+      console.log('Connection error: ', err)
+      client.end()
+    })
+
+    client.on('reconnect', () => {
+      console.log('Reconnecting...')
+    })
+    //
+
+    function action(cmd) {
+      client.publish('su/' + product + '/' + token + '/client', JSON.stringify({
+        'c': 'SW',
+        's': cmd,
+        'tk': hex_md5(token + product + 'SW'),
+      }), { qos: 0, retain: false })
+    }
+    //
+    document.getElementById("powerOn").addEventListener('click', function () {
+      action(2);
+      alert("已执行开机");
+    });
+    //
+    document.getElementById("powerOff").addEventListener('click', function () {
+      action(1);
+      alert("已执行关机");
+    });
+    document.getElementById("restart").addEventListener('click', function () {
+      action(3);
+      alert("已执行重启");
+    });
+    document.getElementById("forceOff").addEventListener('click', function () {
+      action(4);
+      alert("已执行强制关机");
+    });
+    document.getElementById("auto").addEventListener('click', function () {
+      action(5);
+      alert("已执行auto");
+    });
+  </script>
+</body>
+
+</html>
